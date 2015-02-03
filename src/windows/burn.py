@@ -19,6 +19,7 @@
 
 import time
 import subprocess
+import threading
 
 from src.common.errors import BURN_ERROR
 from src.common.utils import calculate_eta, debugger, BYTES_IN_MEGABYTE
@@ -27,6 +28,7 @@ from src.common.paths import _7zip_path, _dd_path
 
 # used to calculate burning speed
 last_written_mb = 0
+burn_success = False
 
 
 def start_burn_process(path, os_info, disk, report_progress_ui):
@@ -50,12 +52,8 @@ def start_burn_process(path, os_info, disk, report_progress_ui):
         return None
 
 
-def burn_kano_os(os_path, disk, size, report_progress_ui):
-    cmd = '"{}\\7za.exe" e -so "{}" | "{}\\dd.exe" of="{}" bs=4M --progress'.format(_7zip_path, os_path, _dd_path, disk)
-    # all handles (in, out, err) need to be set due to PyInstaller bundling
-    process = subprocess.Popen(cmd, shell=True, universal_newlines=True,
-                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+def burn_worker (stderr, size, report_progress_ui):
+    global burn_success
     failed = False
     unparsed_line = ''
 
@@ -65,7 +63,7 @@ def burn_kano_os(os_path, disk, size, report_progress_ui):
     # as long as Popen is running, read it's stderr line by line
     # dd uses a carriage return when printing it's progress, but using
     # universal_newlines converts all line endings into \n
-    for line in iter(process.stderr.readline, ''):
+    for line in iter(stderr.readline, ''):
         line = line.strip()
 
         # looking for dd's progress in the output e.g. '1,234M   \n'
@@ -107,10 +105,28 @@ def burn_kano_os(os_path, disk, size, report_progress_ui):
 
     if failed:
         debugger('[ERROR] Burning Kano image failed')
-        return False
+        burn_success = False
     else:
         debugger('Burning successfully finished')
-        return True
+        burn_success = True
+
+
+def burn_kano_os(os_path, disk, size, report_progress_ui):
+
+    cmd = '"{}\\7za.exe" e -so "{}" | "{}\\dd.exe" of="{}" bs=4M --progress'.format(_7zip_path, os_path, _dd_path, disk)
+    # all handles (in, out, err) need to be set due to PyInstaller bundling
+    process = subprocess.Popen(cmd, shell=True, universal_newlines=True,
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+
+    thread = threading.Thread(target=burn_worker, args=[process.stderr, size, report_progress_ui])
+    thread.daemon = True
+    thread.start()
+
+    process.wait()
+    thread.join(timeout=1)
+
+    return burn_success
 
 
 def calculate_speed(total_written_mb, elapsed_seconds):

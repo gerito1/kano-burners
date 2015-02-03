@@ -18,6 +18,7 @@
 #
 # Tools used: wmic, diskpart, mountvol, dd.exe, nircmd.exe
 
+import time
 
 from src.common.utils import run_cmd_no_pipe, write_file_contents, debugger, BYTES_IN_GIGABYTE
 from src.common.paths import _dd_path, _nircmd_path
@@ -109,7 +110,6 @@ def prepare_disk(disk_id, report_ui):
     close_all_explorer_windows()
 
     report_ui('formatting the disk')
-    format_disk(disk_id)
 
     # Make SURE this is needed BEFORE uncommenting! READ warning!
     # report_ui('unmounting disk')
@@ -117,6 +117,8 @@ def prepare_disk(disk_id, report_ui):
 
     report_ui('testing writing to disk')
     test_write(disk_mount)
+
+    format_disk(disk_id)
 
     # hopefully, the disk should be 'enabled' at this point and
     # dd should have no trouble to write the OS to Partition0
@@ -137,6 +139,10 @@ def get_disk_mount(disk_id):
     # run the created diskpart script
     cmd = 'diskpart /s {}'.format(TEMP_DIR + "detail_disk.txt")
     output, error, return_code = run_cmd_no_pipe(cmd)
+
+    # Every time we call diskpart we should wait for 15 seconds according to documentation
+    # or we coould fail
+    time.sleep(15)
 
     if not return_code:
         debugger('Ran diskpart detail script')
@@ -182,7 +188,7 @@ def close_all_explorer_windows():
 
 
 def test_write(disk_mount):
-    cmd = '{}\\dd.exe if=/dev/random of=\\\\.\\{}: bs=4M count=10'.format(_dd_path, disk_mount)
+    cmd = '{}\\dd.exe if=/dev/random of=\\\\?\\Device\\Harddisk{}\\Partition0: bs=4M count=10'.format(_dd_path, disk_mount)
     _, output, return_code = run_cmd_no_pipe(cmd)
 
     if not return_code:
@@ -238,6 +244,10 @@ def format_disk(disk_id):
     # run the created diskpart script
     cmd = 'diskpart /s {}'.format(TEMP_DIR + "format_disk.txt")
     _, error, return_code = run_cmd_no_pipe(cmd)
+
+    # Every time we call diskpart we should wait for 15 seconds according to documentation
+    # or we coould fail
+    time.sleep(15)
 
     if not return_code:
         debugger('Formatted disk {} with diskpart'.format(id))
