@@ -129,7 +129,7 @@ def get_latest_os_info():
             filename=latest_json['filename'])
 
         gz_url = '{image_url}.gz'.format(image_url=image_url)
-        compressed_filename = latest_json['filename']+'.gz'
+        compressed_filename = '{}.gz'.format(latest_json['filename'])
 
         # use the url for the latest os version to get info about the image
         image_info_json = '{image_url}.json'.format(image_url=image_url)
@@ -148,7 +148,7 @@ def get_latest_os_info():
                    [
                        ('image_url', image_url),
                        ('url', gz_url),
-                       ('compressed_filename',compressed_filename)
+                       ('compressed_filename', compressed_filename)
                    ])
 
     return os_info
