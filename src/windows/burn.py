@@ -43,7 +43,7 @@ def start_burn_process(path, os_info, disk, report_progress_ui):
 
     # the Windows version of dd can easily output writing progress, unlike OSX and Linux
     # so we do not need multithreading and progress polling
-    successful = burn_kano_os(path + os_info['filename'], disk,
+    successful = burn_kano_os(path + os_info['compressed_filename'], disk,
                               os_info['uncompressed_size'], report_progress_ui)
 
     if not successful:
