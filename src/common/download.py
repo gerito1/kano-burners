@@ -26,6 +26,7 @@ import traceback
 from src.common.pySmartDL.pySmartDL import SmartDL, HashFailedException
 from src.common.utils import debugger, LATEST_OS_INFO_URL
 from src.common.errors import DOWNLOAD_ERROR, MD5_ERROR
+from src.common.paths import temp_path
 
 
 class Downloader(SmartDL):
@@ -50,7 +51,7 @@ class Downloader(SmartDL):
         return not self._killed and SmartDL.isFinished(self)
 
 
-def download_kano_os(path, report_progress_ui):
+def download_kano_os(report_progress_ui):
     '''
     This method is used by the backendThread to download Kano OS.
 
@@ -70,7 +71,7 @@ def download_kano_os(path, report_progress_ui):
     # the documentation is misleading - if non blocking mode is used,
     # pySmartDL may still throw exceptions
     try:
-        downloader = Downloader(os_info['url'], dest=path, progress_bar=False)
+        downloader = Downloader(os_info['url'], dest=temp_path, progress_bar=False)
         # simply make sure the file was not corrupted - not for cryptographic security
         downloader.add_hash_verification('md5', os_info['compressed_md5'])
         downloader.start(blocking=False)
@@ -119,21 +120,19 @@ def get_latest_os_info():
         # get latest.json from download.kano.me
         response = urllib2.urlopen(LATEST_OS_INFO_URL)
         latest_json = json.load(response)
+        latest_json['filename'] += '.gz'  # the .gz will be used on all OSs
 
         # give the server some time to breathe between requests
         debugger('Latest Kano OS image is {}'.format(latest_json['filename']))
         time.sleep(1)
 
-        image_url = '{base_url}{filename}'.format(
+        # use the url for the latest os version to get info about the image
+        latest_image_json = '{base_url}{filename}.json'.format(
             base_url=latest_json['base_url'],
             filename=latest_json['filename'])
 
-        gz_url = '{image_url}.gz'.format(image_url=image_url)
-        compressed_filename = '{}.gz'.format(latest_json['filename'])
-
-        # use the url for the latest os version to get info about the image
-        image_info_json = '{image_url}.json'.format(image_url=image_url)
-        response = urllib2.urlopen(image_info_json)
+        debugger('Latest Kano OS image json is {}'.format(latest_image_json))
+        response = urllib2.urlopen(latest_image_json)
         os_json = json.load(response)
 
         # give the server some time to breathe between requests
@@ -144,11 +143,5 @@ def get_latest_os_info():
         return None
 
     # merge the two jsons, add derived values and return a single info dict
-    os_info = dict(latest_json.items() + os_json.items() +
-                   [
-                       ('image_url', image_url),
-                       ('url', gz_url),
-                       ('compressed_filename', compressed_filename)
-                   ])
-
+    os_info = dict(latest_json.items() + os_json.items())
     return os_info
